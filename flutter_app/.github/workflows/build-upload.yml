@@ -1,0 +1,46 @@
+name: Build Flutter APK and Upload to Google Drive
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Install Android SDK dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y openjdk-17-jdk unzip xz-utils zip wget tar libgl1
+        env:
+          DEBIAN_FRONTEND: noninteractive
+
+      - name: Build APK
+        run: flutter build apk
+        working-directory: flutter_app
+
+      - name: Install rclone
+        run: curl https://rclone.org/install.sh | sudo bash
+
+      - name: Restore rclone config
+        run: |
+          echo "${RCLONE_CONF}" | base64 -d > rclone.conf
+          mkdir -p ~/.config/rclone
+          mv rclone.conf ~/.config/rclone/rclone.conf
+
+      - name: Upload APK to Google Drive
+        run: |
+          rclone copy build/app/outputs/flutter-apk/app-release.apk googledrive:/FlutterUploads/
+        env:
+          RCLONE_CONF: ${{ secrets.RCLONE_CONF }}
+        working-directory: flutter_app
